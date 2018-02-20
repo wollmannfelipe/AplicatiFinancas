@@ -7,78 +7,100 @@ namespace RegraDeNegocioFinancas
 {
     public class MovimentoNegocio
     {
+
         public ADSResposta Salvar(MovimentoView c)
         {
-            var db = DBCore.InstanciaDoBanco();
-
-            Movimento novo = null;
-
-            if (!c.Codigo.Equals("0"))
+            var resposta = new ADSResposta();
+            using (var db = DBCore.NovaInstanciaDoBanco())
             {
-                var id = int.Parse(c.Codigo);
-                novo = db.Movimentos.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
-                novo.Descricao = c.Descricao;
-                novo.Data = DateTime.Parse(c.Data);
-                novo.Valor = c.Valor;
-                novo.CategoriaCodigo = c.CategoriaCodigo;
-                novo.ContaCodigo = c.ContaCodigo;
-                novo.TipoMovimentoCodigo = c.TipoMovimentoCodigo;
-                novo.Efetivado = c.Efetivado ? "S" : "N";
-            }
-            else
-            {
-                novo = db.Movimentos.Create();
-                novo.Descricao = c.Descricao;
-                novo.Data = DateTime.Parse(c.Data);
-                novo.Valor = c.Valor;
-                novo.CategoriaCodigo = c.CategoriaCodigo;
-                novo.ContaCodigo = c.ContaCodigo;
-                novo.TipoMovimentoCodigo = c.TipoMovimentoCodigo;
-                novo.Efetivado = c.Efetivado ? "S" : "N";
+                using (var transacao = db.Database.BeginTransaction())
+                {
+                    try
+                    {
+                        Movimento novo = null;
 
-                db.Movimentos.Add(novo);
-            }
+                        if (!c.Codigo.Equals("0"))
+                        {
+                            var id = int.Parse(c.Codigo);
+                            novo = db.Movimentos.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
+                            novo.Descricao = c.Descricao;
+                            novo.Data = DateTime.Parse(c.Data);
+                            novo.Valor = c.Valor;
+                            novo.CategoriaCodigo = c.CategoriaCodigo;
+                            novo.ContaCodigo = c.ContaCodigo;
+                            novo.TipoMovimentoCodigo = c.TipoMovimentoCodigo;
+                            novo.Efetivado = c.Efetivado ? "S" : "N";
+                        }
+                        else
+                        {
+                            novo = db.Movimentos.Create();
+                            novo.Descricao = c.Descricao;
+                            novo.Data = DateTime.Parse(c.Data);
+                            novo.Valor = c.Valor;
+                            novo.CategoriaCodigo = c.CategoriaCodigo;
+                            novo.ContaCodigo = c.ContaCodigo;
+                            novo.TipoMovimentoCodigo = c.TipoMovimentoCodigo;
+                            novo.Efetivado = c.Efetivado ? "S" : "N";
 
-            try
-            {
-                db.SaveChanges();
+                            db.Movimentos.Add(novo);
+                        }
 
-                c.Codigo = novo.Codigo.ToString();
-
-                return new ADSResposta(true, objeto: c);
+                        db.SaveChanges();
+                        c.Codigo = novo.Codigo.ToString();
+                        resposta.Sucesso = true;
+                        resposta.Objeto = c;
+                        transacao.Commit();
+                    }
+                    catch (Exception ex)
+                    {
+                        transacao.Rollback();
+                        resposta.Sucesso = false;
+                        resposta.Mensagem = ex.Message;
+                    }
+                }
             }
-            catch (Exception ex)
-            {
-                return new ADSResposta(false, ex.Message, c);
-            }
+            return resposta;
         }
 
         public ADSResposta Excluir(MovimentoView c)
         {
-            try
+            var resposta = new ADSResposta();
+            using (var db = DBCore.NovaInstanciaDoBanco())
             {
-                using (var db = DBCore.NovaInstanciaDoBanco())
+                using (var transacao = db.Database.BeginTransaction())
                 {
-                    var id = int.Parse(c.Codigo);
-                    var objeto = db.Movimentos.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
-
-                    if (objeto == null)
+                    try
                     {
-                        return new ADSResposta(sucesso: false, mensagem: "Movimento não encontrado.", objeto: c);
+                        var id = int.Parse(c.Codigo);
+                        var movimento = db.Movimentos.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
+
+                        if (movimento == null)
+                        {
+                            resposta.Sucesso = false;
+                            resposta.Objeto = c;
+                            resposta.Mensagem = "Movimento não encontrado.";
+                        }
+                        else
+                        {
+                            db.Movimentos.Remove(movimento);
+                            db.SaveChanges();
+
+                            resposta.Sucesso = true;
+                            resposta.Objeto = c;
+                            transacao.Commit();
+                        }
+
                     }
-
-                    db.Movimentos.Remove(objeto);
-
-                    db.SaveChanges();
-
-                    return new ADSResposta(sucesso: true, objeto: objeto);
+                    catch (Exception ex)
+                    {
+                        transacao.Rollback();
+                        resposta.Sucesso = false;
+                        resposta.Mensagem = ex.Message;
+                    }
                 }
             }
-            catch (Exception ex)
-            {
-                return new ADSResposta(false, ex.Message, c);
-            }
-        }
+            return resposta;
+        }        
 
         public MovimentoView ConverteParaView(Movimento c)
         {

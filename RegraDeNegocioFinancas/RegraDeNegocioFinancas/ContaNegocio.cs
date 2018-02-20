@@ -9,64 +9,85 @@ namespace RegraDeNegocioFinancas
     {
         public ADSResposta Salvar(ContaView c)
         {
-            var db = DBCore.InstanciaDoBanco();
-
-            Conta novo = null;
-
-            if (!c.Codigo.Equals("0"))
+            var resposta = new ADSResposta();
+            using (var db = DBCore.NovaInstanciaDoBanco())
             {
-                var id = int.Parse(c.Codigo);
-                novo = db.Contas.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
-                novo.Descricao = c.Descricao;
-            }
-            else
-            {
-                novo = db.Contas.Create();
-                novo.Descricao = c.Descricao;
+                using (var transacao = db.Database.BeginTransaction())
+                {
+                    try
+                    {
+                        Conta novo = null;
 
-                db.Contas.Add(novo);
-            }
+                        if (!c.Codigo.Equals("0"))
+                        {
+                            var id = int.Parse(c.Codigo);
+                            novo = db.Contas.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
+                            novo.Descricao = c.Descricao;
+                        }
+                        else
+                        {
+                            novo = db.Contas.Create();
+                            novo.Descricao = c.Descricao;
 
-            try
-            {
-                db.SaveChanges();
+                            db.Contas.Add(novo);
+                        }
 
-                c.Codigo = novo.Codigo.ToString();
+                        db.SaveChanges();
+                        c.Codigo = novo.Codigo.ToString();
+                        resposta.Sucesso = true;
+                        resposta.Objeto = c;                        
+                        transacao.Commit();
+                    }
+                    catch (Exception ex)
+                    {
+                        transacao.Rollback();
+                        resposta.Sucesso = false;
+                        resposta.Mensagem = ex.Message;
+                    }
 
-                return new ADSResposta(true, objeto: c);
+                }
             }
-            catch (Exception ex)
-            {
-                return new ADSResposta(false, ex.Message, c);
-            }
+            return resposta;
         }
 
         public ADSResposta Excluir(ContaView c)
         {
-            try
+            var resposta = new ADSResposta();
+            using (var db = DBCore.NovaInstanciaDoBanco())
             {
-                using (var db = DBCore.NovaInstanciaDoBanco())
+                using (var transacao = db.Database.BeginTransaction())
                 {
-                    var id = int.Parse(c.Codigo);
-                    var conta = db.Contas.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
-
-                    if (conta == null)
+                    try
                     {
-                        return new ADSResposta(sucesso: false, mensagem: "Conta não encontrada.", objeto: c);
+                        var id = int.Parse(c.Codigo);
+                        var conta = db.Contas.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
+
+                        if (conta == null)
+                        {
+                            resposta.Sucesso = false;
+                            resposta.Objeto = c;
+                            resposta.Mensagem = "Conta não encontrada.";
+                        }
+                        else
+                        {
+                            db.Contas.Remove(conta);
+                            db.SaveChanges();
+
+                            resposta.Sucesso = true;
+                            resposta.Objeto = c;
+                            transacao.Commit();
+                        }
                     }
-
-                    db.Contas.Remove(conta);
-
-                    db.SaveChanges();
-
-                    return new ADSResposta(sucesso: true, objeto: conta);
+                    catch (Exception ex)
+                    {
+                        transacao.Rollback();
+                        resposta.Sucesso = false;
+                        resposta.Mensagem = ex.Message;
+                    }
                 }
             }
-            catch (Exception ex)
-            {
-                return new ADSResposta(false, ex.Message, c);
-            }
-        }
+            return resposta;
+        }        
 
         public ContaView ConverteParaView(Conta c)
         {

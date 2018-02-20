@@ -9,63 +9,84 @@ namespace RegraDeNegocioFinancas
     {
         public ADSResposta Salvar(CategoriaView c)
         {
-            var db = DBCore.InstanciaDoBanco();
-
-            Categoria novo = null;
-
-            if (!c.Codigo.Equals("0"))
+            var resposta = new ADSResposta();
+            using (var db = DBCore.NovaInstanciaDoBanco())
             {
-                var id = int.Parse(c.Codigo);
-                novo = db.Categorias.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
-                novo.Descricao = c.Descricao;
-            }
-            else
-            {
-                novo = db.Categorias.Create();
-                novo.Descricao = c.Descricao;
+                using (var transacao = db.Database.BeginTransaction())
+                {
+                    try
+                    {
+                        Categoria novo = null;
 
-                db.Categorias.Add(novo);
-            }
+                        if (!c.Codigo.Equals("0"))
+                        {
+                            var id = int.Parse(c.Codigo);
+                            novo = db.Categorias.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
+                            novo.Descricao = c.Descricao;
+                        }
+                        else
+                        {
+                            novo = db.Categorias.Create();
+                            novo.Descricao = c.Descricao;
 
-            try
-            {
-                db.SaveChanges();
+                            db.Categorias.Add(novo);
+                        }
 
-                c.Codigo = novo.Codigo.ToString();
-
-                return new ADSResposta(true, objeto: c);
+                        db.SaveChanges();
+                        c.Codigo = novo.Codigo.ToString();
+                        resposta.Sucesso = true;
+                        resposta.Objeto = c;
+                        transacao.Commit();
+                    }
+                    catch (Exception ex)
+                    {
+                        transacao.Rollback();
+                        resposta.Sucesso = false;
+                        resposta.Mensagem = ex.Message;
+                    }
+                }
             }
-            catch (Exception ex)
-            {
-                return new ADSResposta(false, ex.Message, c);
-            }
+            return resposta;
         }
 
         public ADSResposta Excluir(CategoriaView c)
         {
-            try
+            var resposta = new ADSResposta();
+            using (var db = DBCore.NovaInstanciaDoBanco())
             {
-                using (var db = DBCore.NovaInstanciaDoBanco())
+                using (var transacao = db.Database.BeginTransaction())
                 {
-                    var id = int.Parse(c.Codigo);
-                    var conta = db.Categorias.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
-
-                    if (conta == null)
+                    try
                     {
-                        return new ADSResposta(sucesso: false, mensagem: "Categoria não encontrada.", objeto: c);
+                        var id = int.Parse(c.Codigo);
+                        var categoria = db.Categorias.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
+
+                        if (categoria == null)
+                        {
+                            resposta.Sucesso  = false;
+                            resposta.Objeto   = c;
+                            resposta.Mensagem = "Categoria não encontrada.";
+                        }
+                        else
+                        {
+                            db.Categorias.Remove(categoria);
+                            db.SaveChanges();
+
+                            resposta.Sucesso = true;
+                            resposta.Objeto = c;
+                            transacao.Commit();
+                        }
+
                     }
-
-                    db.Categorias.Remove(conta);
-
-                    db.SaveChanges();
-
-                    return new ADSResposta(sucesso: true, objeto: conta);
+                    catch (Exception ex)
+                    {
+                        transacao.Rollback();
+                        resposta.Sucesso = false;
+                        resposta.Mensagem = ex.Message;
+                    }
                 }
             }
-            catch (Exception ex)
-            {
-                return new ADSResposta(false, ex.Message, c);
-            }
+            return resposta;
         }
 
         public CategoriaView ConverteParaView(Categoria c)
@@ -81,10 +102,10 @@ namespace RegraDeNegocioFinancas
 
         public List<CategoriaView> PegaTodas()
         {
-            var contas = DBCore.InstanciaDoBanco().Categorias.ToList();
+            var categoria = DBCore.InstanciaDoBanco().Categorias.ToList();
 
             var resposta = new List<CategoriaView>();
-            foreach (var c in contas)
+            foreach (var c in categoria)
             {
                 resposta.Add(ConverteParaView(c));
             }
@@ -94,15 +115,15 @@ namespace RegraDeNegocioFinancas
 
         public CategoriaView PegaPorCodigo(int id)
         {
-            var conta = DBCore.InstanciaDoBanco().Categorias
+            var categoria = DBCore.InstanciaDoBanco().Categorias
                 .Where(w => w.Codigo.Equals(id))
                 .FirstOrDefault();
             
             CategoriaView resposta = null;
 
-            if (conta != null)
+            if (categoria != null)
             {
-                resposta = ConverteParaView(conta);
+                resposta = ConverteParaView(categoria);
             }
 
             return resposta;

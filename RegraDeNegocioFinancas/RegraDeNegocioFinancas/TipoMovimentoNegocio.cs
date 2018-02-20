@@ -9,65 +9,89 @@ namespace RegraDeNegocioFinancas
     {
         public ADSResposta Salvar(TipoMovimentoView c)
         {
-            var db = DBCore.InstanciaDoBanco();
-
-            TipoMovimento novo = null;
-
-            if (!c.Codigo.Equals("0"))
+            var resposta = new ADSResposta();
+            using (var db = DBCore.NovaInstanciaDoBanco())
             {
-                var id = int.Parse(c.Codigo);
-                novo = db.TipoMovimento.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
-                novo.Descricao = c.Descricao;
-            }
-            else
-            {
-                novo = db.TipoMovimento.Create();
-                novo.Descricao = c.Descricao;
+                using (var transacao = db.Database.BeginTransaction())
+                {
+                    try
+                    {
+                        TipoMovimento novo = null;
 
-                db.TipoMovimento.Add(novo);
-            }
+                        if (!c.Codigo.Equals("0"))
+                        {
+                            var id = int.Parse(c.Codigo);
+                            novo = db.TipoMovimentos.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
+                            novo.Descricao     = c.Descricao;
+                            novo.CreditoDebito = c.CreditoDebito;
+                        }
+                        else
+                        {
+                            novo = db.TipoMovimentos.Create();
+                            novo.Descricao     = c.Descricao;
+                            novo.CreditoDebito = c.CreditoDebito;
 
-            try
-            {
-                db.SaveChanges();
+                            db.TipoMovimentos.Add(novo);
+                        }
 
-                c.Codigo = novo.Codigo.ToString();
-
-                return new ADSResposta(true, objeto: c);
+                        db.SaveChanges();
+                        c.Codigo = novo.Codigo.ToString();
+                        resposta.Sucesso = true;
+                        resposta.Objeto = c;
+                        transacao.Commit();
+                    }
+                    catch (Exception ex)
+                    {
+                        transacao.Rollback();
+                        resposta.Sucesso = false;
+                        resposta.Mensagem = ex.Message;
+                    }
+                }
             }
-            catch (Exception ex)
-            {
-                return new ADSResposta(false, ex.Message, c);
-            }
+            return resposta;
         }
 
         public ADSResposta Excluir(TipoMovimentoView c)
         {
-            try
+            var resposta = new ADSResposta();
+            using (var db = DBCore.NovaInstanciaDoBanco())
             {
-                using (var db = DBCore.NovaInstanciaDoBanco())
+                using (var transacao = db.Database.BeginTransaction())
                 {
-                    var id = int.Parse(c.Codigo);
-                    var conta = db.TipoMovimento.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
-
-                    if (conta == null)
+                    try
                     {
-                        return new ADSResposta(sucesso: false, mensagem: "Tipo Movimento não encontrada.", objeto: c);
+                        var id = int.Parse(c.Codigo);
+                        var tipomovimento = db.TipoMovimentos.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
+
+                        if (tipomovimento == null)
+                        {
+                            resposta.Sucesso = false;
+                            resposta.Objeto = c;
+                            resposta.Mensagem = "Tipo de movimento não encontrada.";
+                        }
+                        else
+                        {
+                            db.TipoMovimentos.Remove(tipomovimento);
+                            db.SaveChanges();
+
+                            resposta.Sucesso = true;
+                            resposta.Objeto = c;
+                            transacao.Commit();
+                        }
+
                     }
-
-                    db.TipoMovimento.Remove(conta);
-
-                    db.SaveChanges();
-
-                    return new ADSResposta(sucesso: true, objeto: conta);
+                    catch (Exception ex)
+                    {
+                        transacao.Rollback();
+                        resposta.Sucesso = false;
+                        resposta.Mensagem = ex.Message;
+                    }
                 }
             }
-            catch (Exception ex)
-            {
-                return new ADSResposta(false, ex.Message, c);
-            }
+            return resposta;
         }
 
+        
         public TipoMovimentoView ConverteParaView(TipoMovimento c)
         {
             if (c == null) return null;
@@ -81,7 +105,7 @@ namespace RegraDeNegocioFinancas
 
         public List<TipoMovimentoView> PegaTodas()
         {
-            var tipomovimento = DBCore.InstanciaDoBanco().TipoMovimento.ToList();
+            var tipomovimento = DBCore.InstanciaDoBanco().TipoMovimentos.ToList();
 
             var resposta = new List<TipoMovimentoView>();
             foreach (var c in tipomovimento)
@@ -94,15 +118,15 @@ namespace RegraDeNegocioFinancas
 
         public TipoMovimentoView PegaPorCodigo(int id)
         {
-            var conta = DBCore.InstanciaDoBanco().TipoMovimento
+            var tipomovimento = DBCore.InstanciaDoBanco().TipoMovimentos
                 .Where(w => w.Codigo.Equals(id))
                 .FirstOrDefault();
 
             TipoMovimentoView resposta = null;
 
-            if (conta != null)
+            if (tipomovimento != null)
             {
-                resposta = ConverteParaView(conta);
+                resposta = ConverteParaView(tipomovimento);
             }
 
             return resposta;
