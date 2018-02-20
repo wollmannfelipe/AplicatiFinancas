@@ -9,36 +9,39 @@ namespace RegraDeNegocioFinancas
     {
         public ADSResposta Salvar(CategoriaView c)
         {
-            var db = DBCore.InstanciaDoBanco();
+            var resposta = new ADSResposta();
+            using (var db = DBCore.NovaInstanciaDoBanco()) {
+                using(var transacao = db.Database.BeginTransaction()) {
+                    try{
+                        Categoria novo = null;
 
-            Categoria novo = null;
+                        if (!c.Codigo.Equals("0"))
+                        {
+                            var id = int.Parse(c.Codigo);
+                            novo = db.Categorias.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
+                            novo.Descricao = c.Descricao;
+                        }
+                        else
+                        {
+                            novo = db.Categorias.Create();
+                            novo.Descricao = c.Descricao;
 
-            if (!c.Codigo.Equals("0"))
-            {
-                var id = int.Parse(c.Codigo);
-                novo = db.Categorias.Where(w => w.Codigo.Equals(id)).FirstOrDefault();
-                novo.Descricao = c.Descricao;
+                            db.Categorias.Add(novo);
+                        }                        
+                        
+                        db.SaveChanges();
+                        c.Codigo = novo.Codigo.ToString();
+                        resposta.Sucesso = true;
+                        resposta.Objeto = c;
+                        transacao.Commit();                        
+                    }catch(Exception ex) {
+                        transacao.Rollback();
+                        resposta.Sucesso = false;
+                        resposta.Mensagem = ex.Menssage;
+                    }
+                }
             }
-            else
-            {
-                novo = db.Categorias.Create();
-                novo.Descricao = c.Descricao;
-
-                db.Categorias.Add(novo);
-            }
-
-            try
-            {
-                db.SaveChanges();
-
-                c.Codigo = novo.Codigo.ToString();
-
-                return new ADSResposta(true, objeto: c);
-            }
-            catch (Exception ex)
-            {
-                return new ADSResposta(false, ex.Message, c);
-            }
+            return resposta;
         }
 
         public ADSResposta Excluir(CategoriaView c)
