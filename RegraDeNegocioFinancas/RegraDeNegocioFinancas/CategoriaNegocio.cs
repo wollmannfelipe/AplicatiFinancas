@@ -37,7 +37,7 @@ namespace RegraDeNegocioFinancas
                     }catch(Exception ex) {
                         transacao.Rollback();
                         resposta.Sucesso = false;
-                        resposta.Mensagem = ex.Menssage;
+                        resposta.Mensagem = ex.Message;
                     }
                 }
             }
